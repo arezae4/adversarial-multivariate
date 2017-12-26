@@ -93,7 +93,7 @@ public class RosiLBFGSWrapper implements NumericalOptimizer {
       double objectiveValue = objectiveValueAndGradients.getLeft();
       double[] objectiveGradients = objectiveValueAndGradients.getRight();
       try {
-        lbfgs.lbfgs(thetas.length, NUMBER_OF_CORRECTIONS, thetas, objectiveValue,
+        lbfgs.lbfgs(iterationIndex, thetas.length, NUMBER_OF_CORRECTIONS, thetas, objectiveValue,
             objectiveGradients, /* diagco, provide the diagonal matrix Hk0 */false, diag,
             OUTPUT_OPTIONS, MPGConfig.LBFGS_TERMINATE_GRADIENT_TOLERANCE,
             MPGConfig.LBFGS_TERMINATE_VALUE_TOLERANCE, terminationFlag);

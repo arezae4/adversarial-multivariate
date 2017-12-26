@@ -8,6 +8,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.util.MathUtils;
 import org.apache.log4j.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import edu.uic.cs.purposeful.common.assertion.Assert;
 import edu.uic.cs.purposeful.common.assertion.PurposefulBaseException;
 import edu.uic.cs.purposeful.mpg.MPGConfig;
@@ -91,6 +93,13 @@ public class MinimaxSolverGurobiImpl extends MinimaxSolver {
     return descriptionsByErrorCode;
   }
 
+  public MinimaxSolverGurobiImpl() {}
+
+  @VisibleForTesting
+  MinimaxSolverGurobiImpl(double compensatedMaximumScoreThreshold) {
+    super(compensatedMaximumScoreThreshold);
+  }
+
   @Override
   protected Pair<double[], Double> findMaximizerProbabilities(MatrixWrapper scoreMatrix,
       double minimumScore, double maximumScore) {
@@ -99,6 +108,9 @@ public class MinimaxSolverGurobiImpl extends MinimaxSolver {
       // make sure the matrix is positive
       double nonPositiveCompensate = (minimumScore <= 0) ? (1 - minimumScore) : 0.0;
       double compensatedMaximumScore = maximumScore + nonPositiveCompensate;
+      if (compensatedMaximumScore <= compensatedMaximumScoreThreshold) {
+        compensatedMaximumScore = 1; // don't compensate small values
+      }
 
       model = new GRBModel(ENV);
 
@@ -113,10 +125,12 @@ public class MinimaxSolverGurobiImpl extends MinimaxSolver {
           /* default continuous variables */null, /* all variables are given default names */null);
       model.update();
 
+      double[][] _compensatedScoreMatrix = new double[numberOfColumns][]; // for debugging
       // add matrix A
       double minInMatrix = Double.POSITIVE_INFINITY;
       for (int columnIndex = 0; columnIndex < numberOfColumns; columnIndex++) {
         GRBLinExpr lhsExpression = new GRBLinExpr();
+        _compensatedScoreMatrix[columnIndex] = new double[numberOfRows];
         for (int rowIndex = 0; rowIndex < numberOfRows; rowIndex++) {
           double originalScore = scoreMatrix.getValue(rowIndex, columnIndex);
           minInMatrix = Math.min(minInMatrix, originalScore);
@@ -128,6 +142,7 @@ public class MinimaxSolverGurobiImpl extends MinimaxSolver {
           }
           Assert.isTrue(score > 0, "Score passed to Gurobi solver should be positive.");
           lhsExpression.addTerm(score, variables[rowIndex]);
+          _compensatedScoreMatrix[columnIndex][rowIndex] = score;
         }
         // TODO consider using multi-thread?
         model.addConstr(lhsExpression, GRB.GREATER_EQUAL, RHS_VALUE, /* constraint name */
@@ -149,8 +164,10 @@ public class MinimaxSolverGurobiImpl extends MinimaxSolver {
       }
 
       int status = model.get(GRB.IntAttr.Status);
-      Assert.isTrue(status == GRB.Status.OPTIMAL,
-          "Gurobi error! status=[" + status + "], description=[" + ERROR_CODES.get(status) + "]");
+      if (status != GRB.Status.OPTIMAL) {
+        throw new PurposefulBaseException("Gurobi error! status=[" + status + "], description=["
+            + ERROR_CODES.get(status) + "]\n" + Arrays.deepToString(_compensatedScoreMatrix));
+      }
 
       double[] xArray = new double[numberOfRows];
       double xSum = 0.0;

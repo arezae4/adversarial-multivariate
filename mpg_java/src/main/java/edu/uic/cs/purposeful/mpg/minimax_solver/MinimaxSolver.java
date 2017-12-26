@@ -33,9 +33,21 @@ public abstract class MinimaxSolver {
     }
   }
 
+  private static final double DEFAULT_COMPENSATED_MAXIMUM_SCORE_THRESHOLD = 100;
+
   protected static final double OBJECTIVE_COEFFICIENT = 1.0;
   protected static final double RHS_VALUE = 1.0;
   protected static final double TIME_OUT_SECONDS = 60;
+
+  protected final double compensatedMaximumScoreThreshold;
+
+  protected MinimaxSolver(double compensatedMaximumScoreThreshold) {
+    this.compensatedMaximumScoreThreshold = compensatedMaximumScoreThreshold;
+  }
+
+  protected MinimaxSolver() {
+    this(DEFAULT_COMPENSATED_MAXIMUM_SCORE_THRESHOLD);
+  }
 
   public Pair<double[], Double> findMaximizerProbabilities(ScoreMatrix scoreMatrix) {
     Assert.isTrue(scoreMatrix.getRowSize() > 0, "scoreMatrix.getRowSize() <= 0");

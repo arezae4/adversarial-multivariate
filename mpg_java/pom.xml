@@ -8,7 +8,7 @@
 	<packaging>jar</packaging>
 
 	<name>purposeful_mpg_release</name>
-	<url>https://github.com/hwang207/mpg_java</url>
+	<url>https://github.com/arezae4/adversarial-multivariate</url>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -16,7 +16,7 @@
 	<repositories>
 		<repository>
 			<id>mpg_java_release_mvn-repo</id>
-			<url>https://github.com/hwang207/mpg_java/raw/mvn-repo/</url>
+			<url>https://github.com/arezae4/adversarial-multivariate/raw/mvn-repo/</url>
 			<releases>
 				<enabled>true</enabled>
 			</releases>
@@ -145,6 +145,11 @@
 			<artifactId>stanford-corenlp</artifactId>
 			<version>3.6.0</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.carrotsearch</groupId>
+			<artifactId>java-sizeof</artifactId>
+			<version>0.0.5</version>
 		</dependency>
 	</dependencies>
 </project>

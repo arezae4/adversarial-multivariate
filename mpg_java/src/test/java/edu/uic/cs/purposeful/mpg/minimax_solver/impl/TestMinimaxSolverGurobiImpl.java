@@ -17,7 +17,7 @@ public class TestMinimaxSolverGurobiImpl {
 
   @Before
   public void initializeSolverInstance() {
-    solver = new MinimaxSolverGurobiImpl();
+    solver = new MinimaxSolverGurobiImpl(Double.NEGATIVE_INFINITY);
   }
 
   private ScoreMatrix createScoreMatrix(double[][] matrix) {

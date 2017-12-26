@@ -17,7 +17,7 @@ public class TestMinimaxSolverLpSolveImpl {
 
   @Before
   public void initializeSolverInstance() {
-    solver = new MinimaxSolverLpSolveImpl();
+    solver = new MinimaxSolverLpSolveImpl(Double.NEGATIVE_INFINITY);
   }
 
   private ScoreMatrix createScoreMatrix(double[][] matrix) {

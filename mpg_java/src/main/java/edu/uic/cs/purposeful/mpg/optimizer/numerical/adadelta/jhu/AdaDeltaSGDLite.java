@@ -56,7 +56,7 @@ public class AdaDeltaSGDLite {
       xLast = point;
     }
 
-    private boolean doStop() {
+    private boolean doStop(int interationIndex) {
       if (MPGConfig.ADADELTA_USE_TERMINATE_VALUE) {
         int size = values.size();
         double newestVal = values.get(size - 1);
@@ -72,13 +72,24 @@ public class AdaDeltaSGDLite {
 
       // Checks if the gradient is sufficiently small compared to x that it is treated as zero.
       // First do the one norm, because that's easiest, and always bigger.
-      if (gNormLast < MPGConfig.ADADELTA_TERMINATE_GRADIENT_TOLERANCE
-          * Math.max(1.0, norm1(xLast))) {
+      double xnorm1 = Math.max(1.0, norm1(xLast));
+      if (gNormLast < MPGConfig.ADADELTA_TERMINATE_GRADIENT_TOLERANCE * xnorm1) {
         // Now actually compare with the two norm if we have to.
-        if (gNormLast < MPGConfig.ADADELTA_TERMINATE_GRADIENT_TOLERANCE
-            * Math.max(1.0, Math.sqrt(xLast.getL2Norm()))) {
+        double xnorm = Math.max(1.0, Math.sqrt(xLast.getL2Norm()));
+
+        if (MPGConfig.SHOW_RUNNING_TRACING) {
+          LOGGER.warn(String.format("**** Iteration=%d, gnorm=%g, xnorm=%g, gnorm/xnorm=%g",
+              interationIndex, gNormLast, xnorm, gNormLast / xnorm));
+        }
+
+        if (gNormLast < MPGConfig.ADADELTA_TERMINATE_GRADIENT_TOLERANCE * xnorm) {
           LOGGER.warn("AdaDelta terminates: gradients are no longer improved.");
           return true;
+        }
+      } else {
+        if (MPGConfig.SHOW_RUNNING_TRACING) {
+          LOGGER.warn(String.format("**** Iteration=%d, gnorm=%g, xnorm=%g, gnorm/xnorm=%g",
+              interationIndex, gNormLast, xnorm1, gNormLast / xnorm1));
         }
       }
 
@@ -108,6 +119,9 @@ public class AdaDeltaSGDLite {
     batchSize = Math.min(numExamples, MPGConfig.THREAD_POOL_SIZE);
     Assert.isTrue(batchSize > 0);
 
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Batch size set to: " + batchSize);
+    }
     batchSampler = new BatchSampler(/* withReplacement */ false, numExamples, batchSize);
 
     iterations = (int) Math.ceil(MPGConfig.ADADELTA_NUMBER_OF_ITERATIONS * numExamples / batchSize);
@@ -241,7 +255,7 @@ public class AdaDeltaSGDLite {
           }
         }
 
-        if (record.doStop()) {
+        if (record.doStop(passCount)) {
           return true;
         }
 

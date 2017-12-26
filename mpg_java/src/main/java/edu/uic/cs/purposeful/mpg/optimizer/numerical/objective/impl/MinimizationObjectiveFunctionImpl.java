@@ -34,7 +34,18 @@ public class MinimizationObjectiveFunctionImpl<Permutation, InitialData>
   private static final Logger LOGGER = Logger.getLogger(MinimizationObjectiveFunctionImpl.class);
 
   private static enum ObjectiveTask {
-    VALUE, GRADIENTS, BOTH;
+    VALUE("V"), GRADIENTS("G"), BOTH("B");
+
+    private final String display;
+
+    private ObjectiveTask(String display) {
+      this.display = display;
+    }
+
+    @Override
+    public String toString() {
+      return display;
+    }
   }
 
   private static class ValueAndGradients {
@@ -294,14 +305,13 @@ public class MinimizationObjectiveFunctionImpl<Permutation, InitialData>
     if (LOGGER.isInfoEnabled()) {
       double rawGradientsNorm2 = norm2(valueAndGradients.rawObjectiveGradients);
       double gradientRegNorm2 = norm2(valueAndGradients.gradientRegularizations);
-      double gradientNorm2 = norm2(valueAndGradients.objectiveGradients);
-      double thetasNorm2 = norm2(thetas);
-      double gradientThetasRatio = gradientNorm2 / Math.max(1.0, thetasNorm2);
-      LOGGER.info("ValueAndGradients | (gradient/thetas)=" + gradientThetasRatio + ", rawValue="
-          + valueAndGradients.rawObjectiveValue + ", rawGradients=" + rawGradientsNorm2
-          + ", valueReg=" + valueAndGradients.valueRegularization + ", gradientReg="
-          + gradientRegNorm2 + ", value=" + valueAndGradients.objectiveValue + ", gradient="
-          + gradientNorm2);
+      // double gradientNorm2 = norm2(valueAndGradients.objectiveGradients);
+      // double thetasNorm2 = norm2(thetas);
+      // double gradientThetasRatio = gradientNorm2 / Math.max(1.0, thetasNorm2);
+      LOGGER.info("ValueAndGradients | rawValue=" + valueAndGradients.rawObjectiveValue
+          + ", rawGradients=" + rawGradientsNorm2 + ", valueReg="
+          + valueAndGradients.valueRegularization + ", gradientReg=" + gradientRegNorm2 + ", value="
+          + valueAndGradients.objectiveValue);
     }
 
     return Pair.of(valueAndGradients.objectiveValue, valueAndGradients.objectiveGradients);
@@ -338,12 +348,11 @@ public class MinimizationObjectiveFunctionImpl<Permutation, InitialData>
     if (LOGGER.isInfoEnabled()) {
       double rawGradientsNorm2 = norm2(valueAndGradients.rawObjectiveGradients);
       double gradientRegNorm2 = norm2(valueAndGradients.gradientRegularizations);
-      double gradientNorm2 = norm2(valueAndGradients.objectiveGradients);
-      double thetasNorm2 = norm2(thetas);
-      double gradientThetasRatio = gradientNorm2 / Math.max(1.0, thetasNorm2);
-      LOGGER.info("Gradients | (gradient/thetas)=" + gradientThetasRatio + ", rawGradients="
-          + rawGradientsNorm2 + ", gradientReg=" + gradientRegNorm2 + ", gradient="
-          + gradientNorm2);
+      // double gradientNorm2 = norm2(valueAndGradients.objectiveGradients);
+      // double thetasNorm2 = norm2(thetas);
+      // double gradientThetasRatio = gradientNorm2 / Math.max(1.0, thetasNorm2);
+      LOGGER.info(
+          "Gradients | rawGradients=" + rawGradientsNorm2 + ", gradientReg=" + gradientRegNorm2);
     }
 
     return valueAndGradients.objectiveGradients;
@@ -403,6 +412,7 @@ public class MinimizationObjectiveFunctionImpl<Permutation, InitialData>
         Assert.canNeverHappen();
       }
     }
+
     return regularizationScore;
   }
 

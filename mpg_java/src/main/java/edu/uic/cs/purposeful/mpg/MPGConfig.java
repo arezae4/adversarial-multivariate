@@ -56,6 +56,9 @@ public class MPGConfig extends AbstractConfig {
   public static final int MAX_DISPLAY_VECTOR_LENGTH =
       INSTANCE.getIntValue("max_display_vector_length");
 
+  public static final double OPTIMIZATION_TARGET_SCORE_SCALE =
+      INSTANCE.getDoubleValue("optimization_target_score_scale");
+
   public static final String NUMERICAL_OPTIMIZER_IMPLEMENTATION =
       INSTANCE.getStringValue("numerical_optimizer_implementation");
 

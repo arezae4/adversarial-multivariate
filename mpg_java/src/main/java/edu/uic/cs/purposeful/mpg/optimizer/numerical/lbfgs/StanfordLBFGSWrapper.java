@@ -15,7 +15,6 @@ public class StanfordLBFGSWrapper implements NumericalOptimizer {
   private static final Logger LOGGER = Logger.getLogger(StanfordLBFGSWrapper.class);
 
   private static final int NUMBER_OF_PREVIOUS_ESTIMATIONS = 15;
-  private static final boolean USE_ROBUST_OPTIONS = true;
 
   private MinimizationObjectiveFunction objectiveFunction;
 
@@ -50,10 +49,10 @@ public class StanfordLBFGSWrapper implements NumericalOptimizer {
 
   private boolean optimize(double[] thetas, IterationCallback iterationCallback) {
     StanfordCoreNLPQNMinimizerLite lbfgs =
-        new StanfordCoreNLPQNMinimizerLite(NUMBER_OF_PREVIOUS_ESTIMATIONS, USE_ROBUST_OPTIONS);
+        new StanfordCoreNLPQNMinimizerLite(NUMBER_OF_PREVIOUS_ESTIMATIONS);
+    lbfgs.terminateOnMaxItr(MPGConfig.LBFGS_MAX_NUMBER_OF_ITERATIONS);
     lbfgs.shutUp();
-    double[] optimalThetas = lbfgs.minimize(objectiveFunction, thetas,
-        MPGConfig.LBFGS_MAX_NUMBER_OF_ITERATIONS, iterationCallback);
+    double[] optimalThetas = lbfgs.minimize(objectiveFunction, thetas, iterationCallback);
 
     Assert.isTrue(optimalThetas.length == thetas.length);
     System.arraycopy(optimalThetas, 0, thetas, 0, optimalThetas.length);

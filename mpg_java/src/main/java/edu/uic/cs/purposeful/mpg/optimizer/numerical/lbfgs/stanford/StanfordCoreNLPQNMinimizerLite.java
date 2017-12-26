@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.log4j.Logger;
 
 import edu.uic.cs.purposeful.mpg.MPGConfig;
 import edu.uic.cs.purposeful.mpg.optimizer.numerical.IterationCallback;
@@ -72,6 +73,7 @@ import edu.uic.cs.purposeful.mpg.optimizer.numerical.objective.MinimizationObjec
  */
 
 public class StanfordCoreNLPQNMinimizerLite {
+  private static final Logger LOGGER = Logger.getLogger(StanfordCoreNLPQNMinimizerLite.class);
 
   private int fevals = 0; // the number of function evaluations
   private int maxFevals = -1;
@@ -94,9 +96,6 @@ public class StanfordCoreNLPQNMinimizerLite {
   private boolean success = false;
   private boolean bracketed = false; // used for linesearch
 
-  private boolean useAveImprovement = true;
-  private boolean useRelativeNorm = true;
-  private boolean useNumericalZero = true;
   private boolean useMaxItr = false;
   private int maxItr = 0;
 
@@ -104,61 +103,19 @@ public class StanfordCoreNLPQNMinimizerLite {
     TERMINATE_RELATIVENORM, TERMINATE_GRADNORM, TERMINATE_AVERAGEIMPROVE, CONTINUE, TERMINATE_MAXITR
   }
 
-  private static enum eLineSearch {
-    BACKTRACK, MINPACK
-  }
-
   private static enum eScaling {
     DIAGONAL, SCALAR
   }
 
-  private eLineSearch lsOpt = eLineSearch.MINPACK;
   private eScaling scaleOpt = eScaling.DIAGONAL;
   private eState state = eState.CONTINUE;
 
-  public StanfordCoreNLPQNMinimizerLite() {}
-
   public StanfordCoreNLPQNMinimizerLite(int m) {
-    this(m, false);
-  }
-
-  public StanfordCoreNLPQNMinimizerLite(int m, boolean useRobustOptions) {
     mem = m;
-    if (useRobustOptions) {
-      this.setRobustOptions();
-    }
   }
 
   public eState getState() {
     return state;
-  }
-
-  public void setOldOptions() {
-    useAveImprovement = true;
-    useRelativeNorm = false;
-    useNumericalZero = false;
-    lsOpt = eLineSearch.BACKTRACK;
-    scaleOpt = eScaling.SCALAR;
-  }
-
-  public void setRobustOptions() {
-    useAveImprovement = true;
-    useRelativeNorm = true;
-    useNumericalZero = true;
-    lsOpt = eLineSearch.MINPACK;
-    scaleOpt = eScaling.DIAGONAL;
-  }
-
-  public void terminateOnRelativeNorm(boolean toTerminate) {
-    useRelativeNorm = toTerminate;
-  }
-
-  public void terminateOnNumericalZero(boolean toTerminate) {
-    useNumericalZero = toTerminate;
-  }
-
-  public void terminateOnAverageImprovement(boolean toTerminate) {
-    useAveImprovement = toTerminate;
   }
 
   public void terminateOnMaxItr(int maxItr) {
@@ -166,22 +123,6 @@ public class StanfordCoreNLPQNMinimizerLite {
       useMaxItr = true;
       this.maxItr = maxItr;
     }
-  }
-
-  public void useMinPackSearch() {
-    lsOpt = eLineSearch.MINPACK;
-  }
-
-  public void useBacktracking() {
-    lsOpt = eLineSearch.BACKTRACK;
-  }
-
-  public void useDiagonalScaling() {
-    scaleOpt = eScaling.DIAGONAL;
-  }
-
-  public void useScalarScaling() {
-    scaleOpt = eScaling.SCALAR;
   }
 
   public boolean wasSuccessful() {
@@ -192,12 +133,7 @@ public class StanfordCoreNLPQNMinimizerLite {
     this.quiet = true;
   }
 
-  public void setM(int m) {
-    mem = m;
-  }
-
   private static class SurpriseConvergence extends Throwable {
-
     private static final long serialVersionUID = 4290178321643529559L;
 
     private SurpriseConvergence(String s) {
@@ -206,7 +142,6 @@ public class StanfordCoreNLPQNMinimizerLite {
   }
 
   private static class MaxEvaluationsExceeded extends Throwable {
-
     private static final long serialVersionUID = 8044806163343218660L;
 
     private MaxEvaluationsExceeded(String s) {
@@ -313,31 +248,42 @@ public class StanfordCoreNLPQNMinimizerLite {
       // This is used to be able to reproduce results that were trained on the
       // QNMinimizer before
       // convergence criteria was updated.
-      if (useAveImprovement && (size > 5 && Math.abs(averageImprovement / newestVal) < TOL)) {
+      if (size > 5 && Math.abs(averageImprovement / newestVal) < TOL) {
         return eState.TERMINATE_AVERAGEIMPROVE;
       }
 
       // Check to see if the gradient is sufficiently small
-      if (useRelativeNorm && relNorm <= relativeTOL) {
+      if (relNorm <= relativeTOL) {
         return eState.TERMINATE_RELATIVENORM;
       }
 
-      if (useNumericalZero) {
-        // This checks if the gradient is sufficiently small compared to x that
-        // it is treated as zero.
-        if (gNormLast < EPS * Math.max(1.0, ArrayMath.norm_1(xLast))) {
-          // |g| < |x|_1
-          // First we do the one norm, because that's easiest, and always bigger.
-          if (gNormLast < EPS * Math.max(1.0, ArrayMath.norm(xLast))) {
-            // |g| < max(1,|x|)
-            // Now actually compare with the two norm if we have to.
-            System.err.println("Gradient is numerically zero, stopped on machine epsilon.");
-            return eState.TERMINATE_GRADNORM;
-          }
+      // This checks if the gradient is sufficiently small compared to x that
+      // it is treated as zero.
+      double xnorm1 = Math.max(1.0, ArrayMath.norm_1(xLast));
+      if (gNormLast < EPS * xnorm1) {
+        // |g| < |x|_1
+        // First we do the one norm, because that's easiest, and always bigger.
+        double xnorm = Math.max(1.0, ArrayMath.norm(xLast));
+
+        if (MPGConfig.SHOW_RUNNING_TRACING) {
+          LOGGER.warn(String.format("**** Iteration=%d, gnorm=%g, xnorm=%g, gnorm/xnorm=%g",
+              its - 1, gNormLast, xnorm, gNormLast / xnorm));
         }
-        // give user information about the norms.
+
+        if (gNormLast < EPS * xnorm) {
+          // |g| < max(1,|x|)
+          // Now actually compare with the two norm if we have to.
+          System.err.println("Gradient is numerically zero, stopped on machine epsilon.");
+          return eState.TERMINATE_GRADNORM;
+        }
+      } else {
+        if (MPGConfig.SHOW_RUNNING_TRACING) {
+          LOGGER.warn(String.format("**** Iteration=%d, gnorm=%g, xnorm=%g, gnorm/xnorm=%g",
+              its - 1, gNormLast, xnorm1, gNormLast / xnorm1));
+        }
       }
 
+      // give user information about the norms.
       say(" |" + nf.format(gNormLast) + "| {" + nf.format(relNorm) + "} "
           + nf.format(Math.abs(averageImprovement / newestVal)) + " ");
       return eState.CONTINUE;
@@ -632,7 +578,7 @@ public class StanfordCoreNLPQNMinimizerLite {
     return minimize(function, initial, -1, iterationCallback);
   }
 
-  public double[] minimize(MinimizationObjectiveFunction function, double[] initial,
+  private double[] minimize(MinimizationObjectiveFunction function, double[] initial,
       int maxFunctionEvaluations, IterationCallback iterationCallback) {
     if (mem > 0) {
       sayln(" using M = " + mem + '.');
@@ -726,21 +672,8 @@ public class StanfordCoreNLPQNMinimizerLite {
         // perform line search
         say("[");
 
-        double[] newPoint; // initialized in if/else/switch below
-        // switch between line search options.
-        switch (lsOpt) {
-          case BACKTRACK:
-            newPoint = lineSearchBacktrack(function, dir, x, newX, grad, value);
-            say("B");
-            break;
-          case MINPACK:
-            newPoint = lineSearchMinPack(function, dir, x, newX, grad, value,
-                MPGConfig.LBFGS_TERMINATE_VALUE_TOLERANCE);
-            say("M");
-            break;
-          default:
-            throw new IllegalArgumentException("Invalid line search option for QNMinimizer.");
-        }
+        double[] newPoint = lineSearchMinPack(function, dir, x, newX, grad, value,
+            MPGConfig.LBFGS_TERMINATE_VALUE_TOLERANCE);
 
         newValue = newPoint[f];
         say(" ");
@@ -866,62 +799,6 @@ public class StanfordCoreNLPQNMinimizerLite {
     System.arraycopy(valueAndGradients.getRight(), 0, grad, 0, grad.length);
     fevals += 1;
     return valueAndGradients.getLeft();
-  }
-
-  /*
-   * lineSearchBacktrack is the original linesearch used for the first version of QNMinimizer. it
-   * only satisfies sufficient descent not the Wolfe conditions.
-   */
-  private double[] lineSearchBacktrack(MinimizationObjectiveFunction func, double[] dir, double[] x,
-      double[] newX, double[] grad, double lastValue) throws MaxEvaluationsExceeded {
-
-    double normGradInDir = ArrayMath.innerProduct(dir, grad);
-    say("(" + nf.format(normGradInDir) + ")");
-    if (normGradInDir > 0) {
-      say("{WARNING--- direction of positive gradient chosen!}");
-    }
-
-    // c1 can be anything between 0 and 1, exclusive (usu. 1/10 - 1/2)
-    double step, c1;
-
-    // for first few steps, we have less confidence in our initial step-size a
-    // so scale back quicker
-    if (its <= 2) {
-      step = 0.1;
-      c1 = 0.1;
-    } else {
-      step = 1.0;
-      c1 = 0.1;
-    }
-
-    // should be small e.g. 10^-5 ... 10^-1
-    double c = 0.01;
-
-    // double v = func.valueAt(x);
-    // c = c * mult(grad, dir);
-    c = c * normGradInDir;
-
-    double[] newPoint = new double[3];
-
-    while ((newPoint[f] = func.getValue(plusAndConstMult(x, dir, step, newX))) > lastValue
-        + c * step) {
-      fevals += 1;
-      if (newPoint[f] < lastValue) {
-        // an improvement, but not good enough... suspicious!
-        say("!");
-      } else {
-        say(".");
-      }
-      step = c1 * step;
-    }
-
-    newPoint[a] = step;
-    fevals += 1;
-    if (fevals > maxFevals) {
-      throw new MaxEvaluationsExceeded(" Exceeded during lineSearch() Function ");
-    }
-
-    return newPoint;
   }
 
   private double[] lineSearchMinPack(MinimizationObjectiveFunction dfunc, double[] dir, double[] x,

@@ -1,7 +1,9 @@
 package edu.uic.cs.purposeful.mpg.optimizer.game.impl;
 
 import java.util.LinkedHashSet;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import edu.uic.cs.purposeful.mpg.optimizer.numerical.IterationCallback;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.log4j.Logger;
@@ -54,7 +56,7 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
   @Override
   public boolean solve(double[] thetas, Permutation goldPermutation) {
     try {
-      return solve(thetas, goldPermutation, minimaxSolver);
+      return solve(thetas, goldPermutation, minimaxSolver, null);
     } catch (PurposefulBaseException e) {
       if (minimaxBackupSolver == null) {
         throw e;
@@ -63,16 +65,38 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
           MPGConfig.MINIMAX_SOLVER_CLASS + " failed, try " + MPGConfig.MINIMAX_SOLVER_CLASS_BACKUP,
           e);
     }
-    return solve(thetas, goldPermutation, minimaxBackupSolver);
+    return solve(thetas, goldPermutation, minimaxBackupSolver, null);
   }
 
-  private boolean solve(double[] thetas, Permutation goldPermutation, MinimaxSolver minimaxSolver) {
+  @Override
+  public boolean solve(double[] thetas, Permutation goldPermutation, IterationCallback callback) {
+     try {
+      return solve(thetas, goldPermutation, minimaxSolver, callback);
+    } catch (PurposefulBaseException e) {
+      if (minimaxBackupSolver == null) {
+        throw e;
+      }
+      LOGGER.error(
+          MPGConfig.MINIMAX_SOLVER_CLASS + " failed, try " + MPGConfig.MINIMAX_SOLVER_CLASS_BACKUP,
+          e);
+    }
+    return solve(thetas, goldPermutation, minimaxBackupSolver, callback);
+  }
+
+  private boolean solve(double[] thetas, Permutation goldPermutation, MinimaxSolver minimaxSolver, IterationCallback callback) {
     double[] lagrangePotentials = optimizationTarget.computeLagrangePotentials(thetas);
     initializeScoreMatrix(lagrangePotentials, goldPermutation);
 
     double previousGameValue = Double.NaN;
     boolean converged = false;
+    AtomicInteger iterationIndex = new AtomicInteger(0);
     while (true) {
+
+      // callback for iteration, only iteration index is relevant
+      if(callback != null){
+        callback.call(iterationIndex.incrementAndGet(), null);
+      }
+
       // compute maximizer's distribution
       Pair<double[], Double> maximizerDistribution =
           minimaxSolver.findMaximizerProbabilities(scoreMatrix);
@@ -147,8 +171,8 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
           LOGGER.debug("Optimized - minimizer's game value [" + minimizerValue
               + "] doesn't change anymore.");
         }
-        converged = true;
-        break;
+        //converged = true;
+        //break;
       }
       previousGameValue = minimizerValue;
 
@@ -216,13 +240,20 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
       // Lagrange potentials are computed from minimizer permutation
       double aggregatedLagrangePotential =
           optimizationTarget.aggregateLagrangePotentials(minimizerPermutation, lagrangePotentials);
-      double score = optimizationTarget.computeScore(maximizerPermutation, minimizerPermutation)
-          - aggregatedLagrangePotential;
+      double score =
+          computeScore(maximizerPermutation, minimizerPermutation, aggregatedLagrangePotential);
       Assert.isFalse(Double.isNaN(score),
           optimizationTarget.getClass().getName() + ".computeScore() should not return NaN.");
       scoreMatrix.put(rowIndex, columnIndex, score);
       columnIndex++;
     }
+  }
+
+  private double computeScore(Permutation maximizerPermutation, Permutation minimizerPermutation,
+      double aggregatedLagrangePotential) {
+    return MPGConfig.OPTIMIZATION_TARGET_SCORE_SCALE
+        * optimizationTarget.computeScore(maximizerPermutation, minimizerPermutation)
+        - aggregatedLagrangePotential;
   }
 
   private void recordMinimizerPermutationAndExpandScoreMatrix(Permutation minimizerPermutation,
@@ -235,8 +266,8 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
     int columnIndex = scoreMatrix.getColumnSize();
     int rowIndex = 0;
     for (Permutation maximizerPermutation : existingMaximizerPermutations) {
-      double score = optimizationTarget.computeScore(maximizerPermutation, minimizerPermutation)
-          - aggregatedLagrangePotential;
+      double score =
+          computeScore(maximizerPermutation, minimizerPermutation, aggregatedLagrangePotential);
       Assert.isFalse(Double.isNaN(score),
           optimizationTarget.getClass().getName() + ".computeScore() should not return NaN.");
       scoreMatrix.put(rowIndex, columnIndex, score);
@@ -268,8 +299,8 @@ public class DoubleOracleGameSolver<Permutation> implements ZeroSumGameSolver<Pe
 
       int rowIndex = 0;
       for (Permutation maximizerPermutation : existingMaximizerPermutations) {
-        double score = optimizationTarget.computeScore(maximizerPermutation, minimizerPermutation)
-            - aggregatedLagrangePotential;
+        double score =
+            computeScore(maximizerPermutation, minimizerPermutation, aggregatedLagrangePotential);
         Assert.isFalse(Double.isNaN(score),
             optimizationTarget.getClass().getName() + ".computeScore() should not return NaN.");
         scoreMatrix.put(rowIndex, columnIndex, score);

@@ -8,6 +8,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.util.MathUtils;
 import org.apache.log4j.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import edu.uic.cs.purposeful.common.assertion.Assert;
 import edu.uic.cs.purposeful.common.assertion.PurposefulBaseException;
 import edu.uic.cs.purposeful.mpg.MPGConfig;
@@ -55,12 +57,22 @@ public class MinimaxSolverLpSolveImpl extends MinimaxSolver {
     return descriptionsByErrorCode;
   }
 
+  public MinimaxSolverLpSolveImpl() {}
+
+  @VisibleForTesting
+  MinimaxSolverLpSolveImpl(double compensatedMaximumScoreThreshold) {
+    super(compensatedMaximumScoreThreshold);
+  }
+
   @Override
   protected Pair<double[], Double> findMaximizerProbabilities(MatrixWrapper scoreMatrix,
       double minimumScore, double maximumScore) {
     // make sure the matrix is positive
     double nonPositiveCompensate = (minimumScore <= 0) ? (1 - minimumScore) : 0.0;
     double compensatedMaximumScore = maximumScore + nonPositiveCompensate;
+    if (compensatedMaximumScore <= compensatedMaximumScoreThreshold) {
+      compensatedMaximumScore = 1; // don't compensate small values
+    }
 
     int numberOfVariables = scoreMatrix.getNumberOfRows();
     int numberOfConstraints = scoreMatrix.getNumberOfColumns();
@@ -73,6 +85,7 @@ public class MinimaxSolverLpSolveImpl extends MinimaxSolver {
       solver = LpSolve.makeLp(0, numberOfVariables);
       solver.setTimeout((long) TIME_OUT_SECONDS);
 
+      double[][] _compensatedScoreMatrix = new double[numberOfConstraints][]; // for debugging
       double minInMatrix = Double.POSITIVE_INFINITY;
       solver.setAddRowmode(true);
       for (int constraintIndex = 0; constraintIndex < numberOfConstraints; constraintIndex++) {
@@ -90,6 +103,7 @@ public class MinimaxSolverLpSolveImpl extends MinimaxSolver {
           constraint[variableIndex + 1] = score;
         }
         solver.addConstraint(constraint, LpSolve.GE, RHS_VALUE);
+        _compensatedScoreMatrix[constraintIndex] = constraint;
       }
       solver.setAddRowmode(false);
 
@@ -107,8 +121,11 @@ public class MinimaxSolverLpSolveImpl extends MinimaxSolver {
       if (MPGConfig.SHOW_RUNNING_TRACING) {
         System.err.print(".");
       }
-      Assert.isTrue(status == LpSolve.OPTIMAL,
-          "LpSolve error! status=[" + status + "], description=[" + ERROR_CODES.get(status) + "]");
+
+      if (status != LpSolve.OPTIMAL) {
+        throw new PurposefulBaseException("LpSolve error! status=[" + status + "], description=["
+            + ERROR_CODES.get(status) + "]\n" + Arrays.deepToString(_compensatedScoreMatrix));
+      }
 
       double[] xArray = new double[numberOfVariables];
       solver.getVariables(xArray);

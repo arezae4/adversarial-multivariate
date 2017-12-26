@@ -3,15 +3,24 @@ package edu.uic.cs.purposeful.mpg.target.common;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import edu.uic.cs.purposeful.common.assertion.Assert;
 import edu.uic.cs.purposeful.mpg.MPGConfig;
+import edu.uic.cs.purposeful.mpg.target.linear_chain.LinearChain;
+import edu.uic.cs.purposeful.mpg.target.linear_chain.LinearChainConfig;
+import edu.uic.cs.purposeful.mpg.target.linear_chain.f1.LinearChainF1;
+import gnu.trove.list.array.TIntArrayList;
 import net.mintern.primitive.pair.DoubleIntPair;
+import net.mintern.primitive.pair.IntPair;
+import net.mintern.primitive.pair.ObjDoublePair;
 import no.uib.cipr.matrix.DenseMatrix;
 import no.uib.cipr.matrix.MatrixEntry;
 import no.uib.cipr.matrix.UpperSymmDenseMatrix;
@@ -36,6 +45,12 @@ public class GeneralFMeasureMaximizer {
   private static final ConcurrentHashMap<Integer, UpperSymmDenseMatrix> MATRIX_W_CACHE =
       new ConcurrentHashMap<>();
 
+  private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList(0);
+
+  private final int targetTag;
+  private final Map<Integer, Integer> indicesByTag;
+  private final Map<IntPair, Integer> indicesByTagPair;
+
   protected final int numOfPositions;
 
   protected static void outputToConsole(String info) {
@@ -44,8 +59,21 @@ public class GeneralFMeasureMaximizer {
     }
   }
 
+  public GeneralFMeasureMaximizer(int targetTag, Map<Integer, Integer> indicesByTag,
+      Map<IntPair, Integer> indicesByTagPair, int totalNumOfPositions) {
+    this.numOfPositions = totalNumOfPositions;
+    this.targetTag = targetTag;
+    this.indicesByTag = indicesByTag;
+    this.indicesByTagPair = indicesByTagPair;
+  }
+
   public GeneralFMeasureMaximizer(int totalNumOfPositions) {
     this.numOfPositions = totalNumOfPositions;
+
+    // useless fields for #gfm(double, LinkedSparseMatrix)
+    this.targetTag = Integer.MIN_VALUE;
+    this.indicesByTag = null;
+    this.indicesByTagPair = null;
   }
 
   protected UpperSymmDenseMatrix getMatrixW() {
@@ -169,5 +197,136 @@ public class GeneralFMeasureMaximizer {
     }
     return new DenseMatrix(numOfPositions, numOfPositions, negativeLagrangePotentialMatrixInArray,
         false);
+  }
+
+  public Pair<LinearChain, Double> linearChainGFM(double p0, LinkedSparseMatrix matrixP,
+      double[] lagrangePotentials) {
+    LinkedSparseMatrix scoreMatrix = new LinkedSparseMatrix(numOfPositions, numOfPositions);
+    matrixP.mult(2, getMatrixW(), scoreMatrix);
+
+    double bestSum = Double.NEGATIVE_INFINITY;
+    TIntArrayList bestTags = null;
+
+    for (int targetTagTotalCount =
+        0; targetTagTotalCount <= numOfPositions; targetTagTotalCount++) {
+      HashMap<Triple<Integer, Integer, Integer>, ObjDoublePair<TIntArrayList>> cache =
+          new HashMap<>();
+      ObjDoublePair<TIntArrayList> bestForTheTagTotalCount =
+          maxsum(LinearChainConfig.SEQUENCE_STARTING_TAG, 0, targetTagTotalCount,
+              targetTagTotalCount, scoreMatrix, lagrangePotentials, cache);
+
+      TIntArrayList bestTagsForTheTagTotalCount = bestForTheTagTotalCount.getLeft();
+      double bestSumForTheTagTotalCount = bestForTheTagTotalCount.getRight();
+
+      // F1 of all zeros vs all zeros is 1 instead of 0 (with probability p0)
+      if (targetTagTotalCount == 0) {
+        Assert.isTrue(
+            new LinearChain(bestTagsForTheTagTotalCount.toArray(), indicesByTag, indicesByTagPair)
+                .countTag(targetTag) == 0);
+        bestSumForTheTagTotalCount -= p0;
+      }
+
+      if (bestSumForTheTagTotalCount > bestSum) {
+        bestSum = bestSumForTheTagTotalCount;
+        bestTags = bestTagsForTheTagTotalCount;
+      }
+    }
+
+    return Pair.of(new LinearChain(bestTags.toArray(), indicesByTag, indicesByTagPair), -bestSum);
+  }
+
+  private ObjDoublePair<TIntArrayList> maxsum(int previousTag, int currentPositionIndex,
+      int targetTagRemainingCount, int targetTagTotalCount, LinkedSparseMatrix scoreMatrix,
+      double[] lagrangePotentials,
+      Map<Triple<Integer, Integer, Integer>, ObjDoublePair<TIntArrayList>> cache) {
+    Triple<Integer, Integer, Integer> cacheKey =
+        Triple.of(previousTag, currentPositionIndex, targetTagRemainingCount);
+    ObjDoublePair<TIntArrayList> cachedBest = cache.get(cacheKey);
+    if (cachedBest != null) {
+      return cachedBest;
+    }
+
+    if (currentPositionIndex >= numOfPositions) { // i >= end
+      double bestSum;
+      if (targetTagRemainingCount > 0) {
+        bestSum = Double.NEGATIVE_INFINITY;
+      } else {
+        bestSum = 0;
+      }
+      ObjDoublePair<TIntArrayList> best = ObjDoublePair.of(EMPTY_INT_LIST, bestSum);
+      cache.put(cacheKey, best);
+      return best;
+    }
+
+    // score at a certain position
+    double score;
+    if (targetTagTotalCount == 0) {
+      score = 0;
+    } else {
+      // be careful! index in scoreMatrix = targetTagTotalCount - 1
+      score = scoreMatrix.get(currentPositionIndex, targetTagTotalCount - 1);
+    }
+
+    double bestSum = Double.NEGATIVE_INFINITY;
+    TIntArrayList bestTags = null;
+
+    for (int currentTag : indicesByTag.keySet()) {
+      boolean isCurrentTagTarget = (currentTag == targetTag);
+      if (targetTagRemainingCount <= 0 && isCurrentTagTarget) {
+        continue; // impossible since there should be no target tag any more
+      }
+
+      ObjDoublePair<TIntArrayList> nextBest = maxsum(currentTag, currentPositionIndex + 1,
+          isCurrentTagTarget ? (targetTagRemainingCount - 1) : targetTagRemainingCount,
+          targetTagTotalCount, scoreMatrix, lagrangePotentials, cache);
+
+      double nextMaxSum = nextBest.getRight();
+      if (Double.isInfinite(nextMaxSum)) { // can't be the best
+        Assert.isTrue(nextMaxSum < 0, "Must be Double.NEGATIVE_INFINITY");
+        continue;
+      }
+
+      double potential = retrieveLagrangePotential(previousTag, currentTag, currentPositionIndex,
+          lagrangePotentials);
+      double currentSum = potential - (isCurrentTagTarget ? score : 0.0) + nextMaxSum;
+
+      if (currentSum > bestSum) {
+        bestSum = currentSum;
+        TIntArrayList nextBestTags = nextBest.getLeft();
+        bestTags = new TIntArrayList(nextBestTags.size() + 1);
+        bestTags.add(currentTag);
+        bestTags.addAll(nextBestTags);
+      }
+    }
+
+    ObjDoublePair<TIntArrayList> best = ObjDoublePair.of(bestTags, bestSum);
+    cache.put(cacheKey, best);
+    return best;
+  }
+
+  /**
+   * @see LinearChainF1#aggregateLagrangePotentials(LinearChain, double[])
+   */
+  private double retrieveLagrangePotential(int previousTag, int currentTag,
+      int currentPositionIndex, double[] lagrangePotentials) {
+    Assert.isTrue(
+        currentPositionIndex != 0 || previousTag == LinearChainConfig.SEQUENCE_STARTING_TAG);
+
+    int numOfColumns = indicesByTag.size() + indicesByTagPair.size();
+    DenseMatrix lagrangePotentialMatrix =
+        new DenseMatrix(numOfPositions, numOfColumns, lagrangePotentials, false);
+
+    Integer tagIndex = indicesByTag.get(currentTag);
+    double unigramPotential = lagrangePotentialMatrix.get(currentPositionIndex, tagIndex);
+
+    double bigramPotential = 0;
+    if (currentPositionIndex != 0 || LinearChainConfig.ADD_STARTING_TAG) {
+      Integer tagPairIndex = indicesByTagPair.get(IntPair.of(previousTag, currentTag));
+      Assert.notNull(tagPairIndex);
+      bigramPotential =
+          lagrangePotentialMatrix.get(currentPositionIndex, indicesByTag.size() + tagPairIndex);
+    }
+
+    return unigramPotential + bigramPotential;
   }
 }
