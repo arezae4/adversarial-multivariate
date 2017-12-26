@@ -1,3 +1,9 @@
+# Adversarial Structured Prediction for Multivariate Measures
+
+This repository is a java implementation of following papers:
+* [Adversarial Prediction Games for Multivariate Losses](http://papers.nips.cc/paper/5686-adversarial-prediction-games-for-multivariate-losses.pdf)
+* [Adversarial Structured Prediction for Multivariate Measures](https://arxiv.org/abs/1712.07374)
+
 ## Architecture
 ![architecture](https://github.com/hwang207/mpg_java/raw/master/mpg_architecture.png)
 
@@ -12,7 +18,7 @@ There are two options to use MPG framework:
 <repositories>
 	<repository>
 		<id>mpg_java_release_mvn-repo</id>
-		<url>https://github.com/hwang207/mpg_java/raw/mvn-repo/</url>
+		<url>https://github.com/arezae4/adversarial-multivariate/raw/mvn-repo/</url>
 		<releases>
 			<enabled>true</enabled>
 		</releases>
@@ -35,12 +41,16 @@ There are two options to use MPG framework:
 We have unit-tests that go through training and test procedures:
 * F-1: [edu.uic.cs.purposeful.mpg.target.binary.f1.TestBinaryF1Classifier](https://github.com/hwang207/mpg_java/blob/master/mpg_java/src/test/java/edu/uic/cs/purposeful/mpg/target/binary/f1/TestBinaryF1Classifier.java)
 * P@k: [edu.uic.cs.purposeful.mpg.target.binary.precision.TestPrecisionAtKClassifier](https://github.com/hwang207/mpg_java/blob/master/mpg_java/src/test/java/edu/uic/cs/purposeful/mpg/target/binary/precision/TestPrecisionAtKClassifier.java)
+* Linear-Chain F-1: [edu.uic.cs.purposeful.mpg.target.linear_chain.f1.TestLinearChainF1Classifier](https://github.com/arezae4/adversarial-multivariate/blob/master/mpg_java/src/test/java/edu/uic/cs/purposeful/mpg/target/linear_chain/f1/TestLinearChainF1Classifier.java)
+* Linear-Chain F-1 trained with approximation: [edu.uic.cs.purposeful.mpg.target.linear_chain.f1.TestLinearChainApproxF1Classifier](https://github.com/arezae4/adversarial-multivariate/blob/master/mpg_java/src/test/java/edu/uic/cs/purposeful/mpg/target/linear_chain/f1/TestLinearChainApproxF1Classifier.java)
+
 * Datasets are in 'LIBSVM' format
 
 ## Configurations
-* The configurations of MPG framework can be found in [mpg_config.properties](https://github.com/hwang207/mpg_java/blob/master/mpg_java/src/main/resources/config/mpg_config.properties)
-* 'k_percent' for Precision@k is defined in [mpg_precision_at_k_config.properties](https://github.com/hwang207/mpg_java/blob/master/mpg_java/src/main/resources/config/mpg_precision_at_k_config.properties)
-* If you are using MPG as a Maven dependency, and want to change any configuration above, you need to create your configuration 'extension' file(s) to override the existing one(s), and put it/them into 'config' folder in your **classpath** (usually it is 'src/main/resources' or 'src/main/java' in a Maven project):  
+* The configurations of MPG framework can be found in [mpg_config.properties](https://github.com/arezae4/adversarial-multivariate/blob/master/mpg_java/src/main/resources/config/mpg_config.properties)
+* 'k_percent' for Precision@k is defined in [mpg_precision_at_k_config.properties](https://github.com/arezae4/adversarial-multivariate/blob/master/mpg_java/src/main/resources/config/mpg_precision_at_k_config.properties)
+* The configuration for linear_chain can be found in [mpg_linear_chain_config.properties](https://github.com/arezae4/adversarial-multivariate/blob/master/mpg_java/src/main/resources/config/mpg_linear_chain_config.properties)
+* If you are using MPG as a Maven dependency, and want to change any configuration above, you need to create your configuration 'extension' file(s) to override the existing one(s), and put it/them into 'config' folder in your **classpath** (usually it is 'src/main/resources' or 'src/main/java' in a Maven project):
   **config/mpg_config.properties.extension**  
   *(for example, it contains 'show_running_tracing=false' to override the default 'show_running_tracing=true')*  
   
@@ -48,10 +58,21 @@ We have unit-tests that go through training and test procedures:
   *(for example, it contains 'k_percent=0.9' to override the default 'k_percent=0.5')*
   
 ## Citation (BibTeX)
-@inproceedings{wang2015adversarial,  
+@inproceedings{wang2015adversarial,
   title={[Adversarial Prediction Games for Multivariate Losses](http://papers.nips.cc/paper/5686-adversarial-prediction-games-for-multivariate-losses.pdf)},  
   author={Wang, Hong and Xing, Wei and Asif, Kaiser and Ziebart, Brian},  
   booktitle={Advances in Neural Information Processing Systems},  
   pages={2710--2718},  
   year={2015}  
 }
+
+@article{adversarialStructured,
+  title={[Adversarial Structured Prediction for Multivariate Measures](https://arxiv.org/abs/1712.07374)},
+  author={Wang, Hong and Rezaei, Ashkan and Ziebart, Brian},
+  journal = {ArXiv e-prints},
+  archivePrefix = "arXiv",
+  eprint = {1712.07374},
+  year={2017}
+}
+
+
