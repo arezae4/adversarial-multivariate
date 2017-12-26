@@ -59,20 +59,20 @@ We have unit-tests that go through training and test procedures:
   
 ## Citation (BibTeX)
 @inproceedings{wang2015adversarial,
-  title={[Adversarial Prediction Games for Multivariate Losses](http://papers.nips.cc/paper/5686-adversarial-prediction-games-for-multivariate-losses.pdf)},  
+  title={[Adversarial Prediction Games for Multivariate Losses](http://papers.nips.cc/paper/5686-adversarial-prediction-games-for-multivariate-losses.pdf)},   
   author={Wang, Hong and Xing, Wei and Asif, Kaiser and Ziebart, Brian},  
   booktitle={Advances in Neural Information Processing Systems},  
   pages={2710--2718},  
   year={2015}  
 }
 
-@article{adversarialStructured,
-  title={[Adversarial Structured Prediction for Multivariate Measures](https://arxiv.org/abs/1712.07374)},
-  author={Wang, Hong and Rezaei, Ashkan and Ziebart, Brian},
-  journal = {ArXiv e-prints},
-  archivePrefix = "arXiv",
-  eprint = {1712.07374},
-  year={2017}
+@article{adversarialStructured,   
+  title={[Adversarial Structured Prediction for Multivariate Measures](https://arxiv.org/abs/1712.07374)},          
+  author={Wang, Hong and Rezaei, Ashkan and Ziebart, Brian},          
+  journal = {ArXiv e-prints},          
+  archivePrefix = "arXiv",          
+  eprint = {1712.07374},        
+  year={2017}      
 }
 
 
